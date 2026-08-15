@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String           @id @default(cuid())
+  name            String
+  email           String           @unique
+  phone           String?          @unique
+  password        String
+  role            Role             @default(PATIENT)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  appointments    Appointment[]    @relation("PatientAppointments")
+  medicalRecords  MedicalRecord[]  @relation("PatientMedicalRecords")
+  prescriptions   Prescription[]   @relation("PatientPrescriptions")
+}
+
+model Doctor {
+  id                String          @id @default(cuid())
+  name              String
+  specialty         String
+  hospital          String
+  email             String          @unique
+  phone             String
+  fee               Int
+  experience        Int
+  bio               String?
+  qualification     String?
+  clinicAddress     String?
+  consultationMode  String?
+  profileImageUrl   String?
+  clinicImageUrl    String?
+  isAvailable       Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  appointments      Appointment[]
+  availability      Availability[]
+  medicalRecords    MedicalRecord[]
+  prescriptions     Prescription[]
+}
+
+model Availability {
+  id          String       @id @default(cuid())
+  doctorId    String
+  date        DateTime
+  startTime   String
+  endTime     String
+  isBooked    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  doctor      Doctor       @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  appointment Appointment?
+}
+
+model Appointment {
+  id              String            @id @default(cuid())
+  availabilityId  String?           @unique
+  doctorId        String
+  patientId       String
+  appointmentDate DateTime
+  reason          String
+  status          AppointmentStatus @default(CONFIRMED)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  doctor          Doctor            @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  patient         User              @relation("PatientAppointments", fields: [patientId], references: [id], onDelete: Cascade)
+  availability    Availability?     @relation(fields: [availabilityId], references: [id], onDelete: SetNull)
+}
+
+model MedicalRecord {
+  id             String   @id @default(cuid())
+  patientId      String
+  doctorId       String
+  patientPhone   String
+  diagnosis      String
+  testsTaken     String?
+  notes          String?
+  reportUrl      String?
+  reportName     String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  patient        User     @relation("PatientMedicalRecords", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor         Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+model Prescription {
+  id            String   @id @default(cuid())
+  patientId     String
+  doctorId      String
+  diagnosis     String
+  medicines     String
+  instructions  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  patient       User     @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor        Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}

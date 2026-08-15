@@ -1,0 +1,11 @@
+HTTP/1.1 201 Created
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="bookmydoctor-api-testing-guide.pdf"
+Content-Length: 2874
+ETag: W/"b3a-29YUJfLVQEL2FQ8QmcIKy/594xs"
+Date: Sat, 15 Aug 2026 11:10:19 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
