@@ -1,25 +1,38 @@
-import { Router } from 'express';
-import prisma from '../../lib/prisma';
-import { AuthenticatedRequest, requireAuth, requireRole } from '../../middleware/auth';
-import { appointmentSchema, appointmentUpdateSchema } from './appointment.schema';
+import { Router } from "express";
+import prisma from "../../lib/prisma";
+import {
+  AuthenticatedRequest,
+  requireAuth,
+  requireRole,
+} from "../../middleware/auth";
+import {
+  appointmentSchema,
+  appointmentUpdateSchema,
+} from "./appointment.schema";
 
 const router = Router();
 
-router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const isAdmin = req.user?.role === 'ADMIN';
+router.get("/", requireAuth, async (req: AuthenticatedRequest, res) => {
+  const isAdmin = req.user?.role === "ADMIN";
   const page = Math.max(1, Number(req.query.page ?? 1));
   const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 10)));
-  const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-  const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-  const doctorId = typeof req.query.doctorId === 'string' ? req.query.doctorId : undefined;
-  const patientId = typeof req.query.patientId === 'string' ? req.query.patientId : undefined;
+  const status =
+    typeof req.query.status === "string" ? req.query.status : undefined;
+  const search =
+    typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const doctorId =
+    typeof req.query.doctorId === "string" ? req.query.doctorId : undefined;
+  const patientId =
+    typeof req.query.patientId === "string" ? req.query.patientId : undefined;
 
-  const where: Record<string, any> = isAdmin ? {} : {
-    OR: [
-      { patientId: req.user?.sub ?? '' },
-      { doctorId: req.user?.sub ?? '' },
-    ],
-  };
+  const where: Record<string, any> = isAdmin
+    ? {}
+    : {
+        OR: [
+          { patientId: req.user?.sub ?? "" },
+          { doctorId: req.user?.sub ?? "" },
+        ],
+      };
 
   if (status) where.status = status;
   if (doctorId) where.doctorId = doctorId;
@@ -28,13 +41,20 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
   if (search) {
     where.OR = [
       ...(where.OR ? where.OR : []),
-      { reason: { contains: search, mode: 'insensitive' } },
-      { doctor: { name: { contains: search, mode: 'insensitive' } } },
-      { patient: { name: { contains: search, mode: 'insensitive' } } },
+      { reason: { contains: search, mode: "insensitive" } },
+      { doctor: { name: { contains: search, mode: "insensitive" } } },
+      { patient: { name: { contains: search, mode: "insensitive" } } },
     ];
   }
 
-  const hasListMode = Boolean(req.query.page || req.query.limit || req.query.status || req.query.search || req.query.doctorId || req.query.patientId);
+  const hasListMode = Boolean(
+    req.query.page ||
+    req.query.limit ||
+    req.query.status ||
+    req.query.search ||
+    req.query.doctorId ||
+    req.query.patientId,
+  );
 
   if (!hasListMode) {
     const appointments = await prisma.appointment.findMany({
@@ -43,7 +63,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
         doctor: true,
         patient: true,
       },
-      orderBy: { appointmentDate: 'asc' },
+      orderBy: { appointmentDate: "asc" },
     });
     return res.status(200).json(appointments);
   }
@@ -58,7 +78,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
       },
       skip,
       take: limit,
-      orderBy: { appointmentDate: 'asc' },
+      orderBy: { appointmentDate: "asc" },
     }),
     prisma.appointment.count({ where }),
   ]);
@@ -76,41 +96,64 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res) => {
   });
 });
 
-router.post('/guest-book', async (req, res) => {
-  const guestName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-  const guestPhone = typeof req.body?.phone === 'string' ? req.body.phone.trim() : '';
-  const doctorId = typeof req.body?.doctorId === 'string' ? req.body.doctorId : '';
-  const availabilityId = typeof req.body?.availabilityId === 'string' ? req.body.availabilityId : '';
-  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+router.post("/guest-book", async (req, res) => {
+  const guestName =
+    typeof req.body?.name === "string" ? req.body.name.trim() : "";
+  const guestPhone =
+    typeof req.body?.phone === "string" ? req.body.phone.trim() : "";
+  const doctorId =
+    typeof req.body?.doctorId === "string" ? req.body.doctorId : "";
+  const availabilityId =
+    typeof req.body?.availabilityId === "string" ? req.body.availabilityId : "";
+  const reason =
+    typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
 
   if (!guestName || !guestPhone || !doctorId || !availabilityId || !reason) {
-    return res.status(400).json({ message: 'name, phone, doctorId, availabilityId and reason are required' });
+    return res
+      .status(400)
+      .json({
+        message:
+          "name, phone, doctorId, availabilityId and reason are required",
+      });
   }
 
-  const slot = await prisma.availability.findUnique({ where: { id: availabilityId }, include: { doctor: true } });
+  const slot = await prisma.availability.findUnique({
+    where: { id: availabilityId },
+    include: { doctor: true },
+  });
   if (!slot) {
-    return res.status(404).json({ message: 'Availability slot not found' });
+    return res.status(404).json({ message: "Availability slot not found" });
   }
 
   if (slot.doctorId !== doctorId) {
-    return res.status(400).json({ message: 'Availability does not match the selected doctor' });
+    return res
+      .status(400)
+      .json({ message: "Availability does not match the selected doctor" });
   }
 
   if (slot.isBooked) {
-    return res.status(409).json({ message: 'This time slot is already booked' });
+    return res
+      .status(409)
+      .json({ message: "This time slot is already booked" });
   }
 
-  const existingPatient = await prisma.user.findUnique({ where: { phone: guestPhone } });
+  const existingPatient = await prisma.user.findUnique({
+    where: { phone: guestPhone },
+  });
 
-  const patientId = existingPatient?.id ?? (await prisma.user.create({
-    data: {
-      name: guestName,
-      email: `guest-${Date.now()}-${Math.random().toString(36).slice(2)}@bookmydoctor.local`,
-      phone: guestPhone,
-      password: `guest-${Date.now()}`,
-      role: 'PATIENT',
-    },
-  })).id;
+  const patientId =
+    existingPatient?.id ??
+    (
+      await prisma.user.create({
+        data: {
+          name: guestName,
+          email: `guest-${Date.now()}-${Math.random().toString(36).slice(2)}@bookmydoctor.local`,
+          phone: guestPhone,
+          password: `guest-${Date.now()}`,
+          role: "PATIENT",
+        },
+      })
+    ).id;
 
   const appointment = await prisma.$transaction(async (tx) => {
     const createdAppointment = await tx.appointment.create({
@@ -120,7 +163,7 @@ router.post('/guest-book', async (req, res) => {
         availabilityId: slot.id,
         appointmentDate: slot.date,
         reason,
-        status: 'CONFIRMED',
+        status: "CONFIRMED",
       },
       include: {
         doctor: true,
@@ -138,30 +181,34 @@ router.post('/guest-book', async (req, res) => {
   });
 
   return res.status(201).json({
-    message: 'Guest appointment booked successfully',
+    message: "Guest appointment booked successfully",
     appointment,
   });
 });
 
-router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
+router.post("/", requireAuth, async (req: AuthenticatedRequest, res) => {
   const parsed = appointmentSchema.safeParse(req.body);
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: 'Validation failed',
+      message: "Validation failed",
       errors: parsed.error.flatten(),
     });
   }
 
   const { patientId, availabilityId, reason } = parsed.data;
 
-  if (req.user && req.user.role === 'PATIENT' && req.user.sub !== patientId) {
-    return res.status(403).json({ message: 'You can only book for your own account' });
+  if (req.user && req.user.role === "PATIENT" && req.user.sub !== patientId) {
+    return res
+      .status(403)
+      .json({ message: "You can only book for your own account" });
   }
 
-  const patientExists = await prisma.user.findUnique({ where: { id: patientId } });
+  const patientExists = await prisma.user.findUnique({
+    where: { id: patientId },
+  });
   if (!patientExists) {
-    return res.status(404).json({ message: 'Patient not found' });
+    return res.status(404).json({ message: "Patient not found" });
   }
 
   const slot = availabilityId
@@ -169,11 +216,13 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
     : null;
 
   if (!slot) {
-    return res.status(404).json({ message: 'Availability slot not found' });
+    return res.status(404).json({ message: "Availability slot not found" });
   }
 
   if (slot.isBooked) {
-    return res.status(409).json({ message: 'This time slot is already booked' });
+    return res
+      .status(409)
+      .json({ message: "This time slot is already booked" });
   }
 
   const existingAppointment = await prisma.appointment.findFirst({
@@ -183,11 +232,15 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
   });
 
   if (existingAppointment) {
-    return res.status(409).json({ message: 'This time slot is already booked' });
+    return res
+      .status(409)
+      .json({ message: "This time slot is already booked" });
   }
 
   if (slot.doctorId !== parsed.data.doctorId && parsed.data.doctorId) {
-    return res.status(400).json({ message: 'Availability does not match provided doctor' });
+    return res
+      .status(400)
+      .json({ message: "Availability does not match provided doctor" });
   }
 
   const appointment = await prisma.$transaction(async (tx) => {
@@ -198,7 +251,7 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
         availabilityId: slot.id,
         appointmentDate: slot.date,
         reason,
-        status: 'CONFIRMED',
+        status: "CONFIRMED",
       },
       include: {
         doctor: true,
@@ -216,27 +269,31 @@ router.post('/', requireAuth, async (req: AuthenticatedRequest, res) => {
   });
 
   return res.status(201).json({
-    message: 'Appointment created successfully',
+    message: "Appointment created successfully",
     appointment,
   });
 });
 
-router.put('/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
+router.put("/:id", requireAuth, async (req: AuthenticatedRequest, res) => {
   const parsed = appointmentUpdateSchema.safeParse(req.body);
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: 'Validation failed',
+      message: "Validation failed",
       errors: parsed.error.flatten(),
     });
   }
 
-  const appointmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const appointmentId = Array.isArray(req.params.id)
+    ? req.params.id[0]
+    : req.params.id;
   const appointment = await prisma.appointment.update({
     where: { id: appointmentId },
     data: {
       ...parsed.data,
-      appointmentDate: parsed.data.appointmentDate ? new Date(parsed.data.appointmentDate) : undefined,
+      appointmentDate: parsed.data.appointmentDate
+        ? new Date(parsed.data.appointmentDate)
+        : undefined,
     },
     include: {
       doctor: true,
@@ -245,101 +302,156 @@ router.put('/:id', requireAuth, async (req: AuthenticatedRequest, res) => {
   });
 
   return res.status(200).json({
-    message: 'Appointment updated successfully',
+    message: "Appointment updated successfully",
     appointment,
   });
 });
 
-router.patch('/:id/status', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const allowedStatuses = ['PENDING', 'CONFIRMED', 'CANCELLED', 'COMPLETED'] as const;
-  const statusValue = typeof req.body?.status === 'string' ? req.body.status.toUpperCase() : undefined;
+router.patch(
+  "/:id/status",
+  requireAuth,
+  async (req: AuthenticatedRequest, res) => {
+    const allowedStatuses = [
+      "PENDING",
+      "CONFIRMED",
+      "CANCELLED",
+      "COMPLETED",
+    ] as const;
+    const statusValue =
+      typeof req.body?.status === "string"
+        ? req.body.status.toUpperCase()
+        : undefined;
 
-  if (!statusValue || !allowedStatuses.includes(statusValue as typeof allowedStatuses[number])) {
-    return res.status(400).json({ message: 'Valid appointment status is required' });
-  }
-
-  const appointmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  const existingAppointment = await prisma.appointment.findUnique({
-    where: { id: appointmentId },
-    include: { availability: true },
-  });
-
-  if (!existingAppointment) {
-    return res.status(404).json({ message: 'Appointment not found' });
-  }
-
-  if (req.user?.role === 'PATIENT' && req.user.sub !== existingAppointment.patientId) {
-    return res.status(403).json({ message: 'You can only manage your own appointments' });
-  }
-
-  const appointment = await prisma.$transaction(async (tx) => {
-    const updatedAppointment = await tx.appointment.update({
-      where: { id: appointmentId },
-      data: { status: statusValue as typeof allowedStatuses[number] },
-      include: { doctor: true, patient: true, availability: true },
-    });
-
-    if (statusValue === 'CANCELLED' && updatedAppointment.availabilityId) {
-      await tx.availability.update({
-        where: { id: updatedAppointment.availabilityId },
-        data: { isBooked: false },
-      });
+    if (
+      !statusValue ||
+      !allowedStatuses.includes(statusValue as (typeof allowedStatuses)[number])
+    ) {
+      return res
+        .status(400)
+        .json({ message: "Valid appointment status is required" });
     }
 
-    return updatedAppointment;
-  });
+    const appointmentId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+    const existingAppointment = await prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: { availability: true },
+    });
 
-  return res.status(200).json({
-    message: 'Appointment status updated successfully',
-    appointment,
-  });
-});
+    if (!existingAppointment) {
+      return res.status(404).json({ message: "Appointment not found" });
+    }
 
-router.get('/patient/:patientId', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const patientId = Array.isArray(req.params.patientId) ? req.params.patientId[0] : req.params.patientId;
+    if (
+      req.user?.role === "PATIENT" &&
+      req.user.sub !== existingAppointment.patientId
+    ) {
+      return res
+        .status(403)
+        .json({ message: "You can only manage your own appointments" });
+    }
 
-  if (req.user?.role === 'PATIENT' && req.user.sub !== patientId) {
-    return res.status(403).json({ message: 'You can only view your own appointment history' });
-  }
+    const appointment = await prisma.$transaction(async (tx) => {
+      const updatedAppointment = await tx.appointment.update({
+        where: { id: appointmentId },
+        data: { status: statusValue as (typeof allowedStatuses)[number] },
+        include: { doctor: true, patient: true, availability: true },
+      });
 
-  const appointments = await prisma.appointment.findMany({
-    where: { patientId },
-    include: {
-      doctor: true,
-      patient: true,
-      availability: true,
-    },
-    orderBy: { appointmentDate: 'asc' },
-  });
+      if (statusValue === "CANCELLED" && updatedAppointment.availabilityId) {
+        await tx.availability.update({
+          where: { id: updatedAppointment.availabilityId },
+          data: { isBooked: false },
+        });
+      }
 
-  return res.status(200).json(appointments);
-});
+      return updatedAppointment;
+    });
 
-router.get('/doctor/:doctorId', requireAuth, async (req: AuthenticatedRequest, res) => {
-  const doctorId = Array.isArray(req.params.doctorId) ? req.params.doctorId[0] : req.params.doctorId;
+    return res.status(200).json({
+      message: "Appointment status updated successfully",
+      appointment,
+    });
+  },
+);
 
-  if (req.user?.role === 'DOCTOR' && req.user.sub !== doctorId) {
-    return res.status(403).json({ message: 'You can only view your own appointment dashboard' });
-  }
+router.get(
+  "/patient/:patientId",
+  requireAuth,
+  async (req: AuthenticatedRequest, res) => {
+    const patientId = Array.isArray(req.params.patientId)
+      ? req.params.patientId[0]
+      : req.params.patientId;
 
-  const appointments = await prisma.appointment.findMany({
-    where: { doctorId },
-    include: {
-      doctor: true,
-      patient: true,
-      availability: true,
-    },
-    orderBy: { appointmentDate: 'asc' },
-  });
+    if (req.user?.role === "PATIENT" && req.user.sub !== patientId) {
+      return res
+        .status(403)
+        .json({ message: "You can only view your own appointment history" });
+    }
 
-  return res.status(200).json(appointments);
-});
+    const appointments = await prisma.appointment.findMany({
+      where: { patientId },
+      include: {
+        doctor: true,
+        patient: true,
+        availability: true,
+      },
+      orderBy: { appointmentDate: "asc" },
+    });
 
-router.delete('/:id', requireAuth, requireRole(['ADMIN']), async (req: AuthenticatedRequest, res) => {
-  const appointmentId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-  await prisma.appointment.delete({ where: { id: appointmentId } });
+    return res.status(200).json(appointments);
+  },
+);
 
-  return res.status(200).json({ message: 'Appointment deleted successfully' });
-});
+router.get(
+  "/doctor/:doctorId",
+  requireAuth,
+  async (req: AuthenticatedRequest, res) => {
+    const doctorId = Array.isArray(req.params.doctorId)
+      ? req.params.doctorId[0]
+      : req.params.doctorId;
+
+    if (req.user?.role === "DOCTOR") {
+      const doctor = await prisma.doctor.findUnique({
+        where: { id: doctorId },
+      });
+
+      if (!doctor || doctor.email !== req.user.email) {
+        return res.status(403).json({
+          message: "You can only view your own appointment dashboard",
+        });
+      }
+    }
+
+    const appointments = await prisma.appointment.findMany({
+      where: { doctorId },
+      include: {
+        doctor: true,
+        patient: true,
+        availability: true,
+      },
+      orderBy: { appointmentDate: "asc" },
+    });
+
+    return res.status(200).json(appointments);
+  },
+);
+
+router.delete(
+  "/:id",
+  requireAuth,
+  requireRole(["ADMIN"]),
+  async (req: AuthenticatedRequest, res) => {
+    const appointmentId = Array.isArray(req.params.id)
+      ? req.params.id[0]
+      : req.params.id;
+    await prisma.appointment.delete({ where: { id: appointmentId } });
+
+    return res
+      .status(200)
+      .json({ message: "Appointment deleted successfully" });
+  },
+);
 
 export default router;
